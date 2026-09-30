@@ -1280,21 +1280,48 @@
     });
     wrapper.appendChild(table);
 
+    // Second-factor check before releasing the full record: the applicant
+    // must type their own Aadhaar number. Unlike class+DOB+ID/PEN (already
+    // checked to reach this screen), a 12-digit Aadhaar isn't something a
+    // stranger can easily guess or already know.
+    var aadharField = document.createElement('div');
+    aadharField.style.cssText = 'margin-top:16px;';
+    var aadharLabel = document.createElement('label');
+    aadharLabel.textContent = 'पुष्टि हेतु आधार संख्या दर्ज करें / Enter Aadhaar number to confirm';
+    aadharLabel.style.cssText = 'display:block;font-weight:600;font-size:.85rem;margin-bottom:6px;color:var(--navy);';
+    var aadharInput = document.createElement('input');
+    aadharInput.type = 'text'; aadharInput.inputMode = 'numeric'; aadharInput.maxLength = 14;
+    aadharInput.placeholder = '12 अंकों की आधार संख्या';
+    aadharInput.style.cssText = 'width:100%;padding:10px 12px;border:1px solid #ccc;border-radius:4px;font-size:1rem;box-sizing:border-box;';
+    var aadharErr = document.createElement('div');
+    aadharErr.className = 'err-text';
+    aadharErr.style.cssText = 'min-height:1.1em;margin-top:6px;';
+    aadharInput.addEventListener('input', function(){ aadharErr.textContent = ''; });
+    aadharField.appendChild(aadharLabel); aadharField.appendChild(aadharInput); aadharField.appendChild(aadharErr);
+    wrapper.appendChild(aadharField);
+
     var bRow = document.createElement('div'); bRow.className = 'btn-row'; bRow.style.marginTop = '16px';
     var confirmBtn = document.createElement('button');
     confirmBtn.type = 'button'; confirmBtn.className = 'btn btn-success';
     confirmBtn.textContent = '✅ हाँ, यह मेरा आवेदन है — डाउनलोड करें';
     confirmBtn.onclick = function(){
+      var aadhar = aadharInput.value.replace(/\D/g, '');
+      if(aadhar.length !== 12){
+        aadharErr.textContent = 'कृपया सही 12 अंकों की आधार संख्या दर्ज करें।';
+        aadharInput.focus();
+        return;
+      }
+      aadharErr.textContent = '';
       confirmBtn.disabled = true;
       confirmBtn.textContent = '⏳ ...';
       fetch(CONFIG.WEB_APP_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'searchReveal', applicationId: previewRecord.applicationId, revealToken: revealToken })
+        body: JSON.stringify({ action: 'searchReveal', applicationId: previewRecord.applicationId, revealToken: revealToken, aadhar: aadhar })
       })
         .then(function(res){ return res.json(); })
         .then(function(result){
           if(!result.success){
-            toast(result.error || 'प्रति प्राप्त नहीं हो सकी।');
+            aadharErr.textContent = result.error || 'प्रति प्राप्त नहीं हो सकी।';
             confirmBtn.disabled = false;
             confirmBtn.textContent = '✅ हाँ, यह मेरा आवेदन है — डाउनलोड करें';
             return;
@@ -1305,7 +1332,7 @@
           buildPrintableApplication(r, r.applicationId);
         })
         .catch(function(){
-          toast('नेटवर्क त्रुटि — प्रति प्राप्त नहीं हो सकी।');
+          aadharErr.textContent = 'नेटवर्क त्रुटि — प्रति प्राप्त नहीं हो सकी।';
           confirmBtn.disabled = false;
           confirmBtn.textContent = '✅ हाँ, यह मेरा आवेदन है — डाउनलोड करें';
         });
